@@ -1,0 +1,120 @@
+#:kivy 1.1.0
+
+<SLabel@Label>:
+	height:10
+	
+<MLabel@Label>:
+	#width: 200
+	size_hint: None, None
+	size: self.texture_size
+
+<RootLayout>:
+	BoxLayout:
+		orientation: "vertical"
+		padding: 5
+		spacing: 5
+	
+		MLabel:
+			text: "Welcome in PMPP"
+			
+		
+		MLabel:
+			text: "show / hide layers:"
+		
+			
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_foamLayer
+			Label:
+				text: "foam paths G1"
+				
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_outerLayer
+			Label:
+				text: "outer paths"
+				
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_offsets90Layer
+			Label:
+				text: "calculated 90 offsets"
+				
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_offsetLayer
+				active: True
+			Label:
+				text: "milling paths"
+
+
+
+
+		BoxLayout:
+			orientation: "horizontal"
+			Label:
+				text: "all"
+				
+				
+			Button:
+				text: "/\\"
+				on_release: app.on_zUp()
+				
+			Label:
+				id: l_zSlider
+				text: "z"
+				
+			Button:
+				text: "\\/"
+				on_release: app.on_zDown()
+		
+
+
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_allLayer
+				active: False
+				
+			Slider:
+				id: s_sh_hLayer
+				min: 0.0
+				value: 70.0
+				max: 2000.0
+				on_touch_up: self.collide_point( *args[1].pos ) and app.on_hLayerChange(self)
+				on_touch_move: app.on_hLayerMove(self)
+				
+
+		
+		Button:
+			text: "plot"
+			on_release: app.on_plot()
+			
+		BoxLayout:
+			orientation: "horizontal"
+			
+			CheckBox:
+				id: cb_sh_volume
+				active: False
+			Label:
+				text: "flow of E in paths"
+			
+		
+		MLabel:
+			text: "Additional info:"
+			
+		MLabel:
+			id: lAddInf
+			text: "lAddInf"
+			
+			
+			
