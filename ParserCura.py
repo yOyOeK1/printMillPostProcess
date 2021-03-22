@@ -5,7 +5,6 @@ from shapely.geometry import Polygon,Point,LineString,MultiLineString
 from shapely.geometry.multipolygon import MultiPolygon
 import numpy as np
 import random
-from builtins import enumerate
 import math
 from myPickle import myPickle
 from FileActions import *
@@ -96,7 +95,9 @@ class ParserCura:
         self.totalFoamMil = 0.0
         
         
-    def makeIt(self, filePath, dVal):
+    def makeIt(self, filePath, outFile, makeE, dVal):
+        self.outFile = outFile
+        self.outFileMakeE = makeE
         self.bottomLeftForFinish = dVal['bottomLeft']
         print("ParserCura makeIt [{0}]".format(filePath))
         filehashhash = "cashePMPP_{}_{}".format(
@@ -111,7 +112,7 @@ class ParserCura:
         self.layerHeight = self.lookForLayerHeight( self.linesOrg )
         self.complitLines,self.complitV4l = self.makeComplitLines( self.linesOrg )
         self.zLayers = sorted(self.zLayers.keys())
-        self.complitV4l = self.makeOffsets( self.complitV4l, [0.01, 0.01, 0.01] )
+        self.complitV4l = self.makeOffsets( self.complitV4l, dVal['bottomLeft'] )
         #self.allWorkPathsV4l = self.extractAllWorkPaths( self.complitV4l, dVal )
         self.allWorkPathsV4l = self.complitV4l
         #self.outerWallV4l = self.extractOuter( self.complitV4l, dVal )
@@ -340,22 +341,28 @@ class ParserCura:
         millLayers = []
         millLast = 0.0
         zTzs = []
-        offSets = dVal['bottomLeft']
-        
+        offSets = dVal['bottomLeft']        
         zLast = sorted(list(self.polys.keys()))[-1]
-        fFoam = open("/tmp/foamPath.gcode","w")
+        
+        
+        fFoamOW = None
+        fFoamOWC = 1
+        fMillOW = None
+        fMillOWC = 1
+        
+        fFoam = open(self.outFile+"_foamPath.gcode","w")
         fFoam.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical'] 
             ))
         
-        fMillTops = open("/tmp/millTopsPath.gcode","w")
+        fMillTops = open(self.outFile+"_millTopsPath.gcode","w")
         fMillTops.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical']
             ))
                 
-        fAll = open("/tmp/allPaths.gcode","w")
+        fAll = open(self.outFile+"_allPaths.gcode","w")
         fAll.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical']
@@ -420,25 +427,59 @@ class ParserCura:
                 toolD = dVal['foam']['width']*0.5 
                 fPolyOrg = fPoly
                 foamPaths = self.makeIslandPath(
-                    fPoly.buffer( -toolD*.3 ).buffer( 0.0 ), 
+                    fPoly.buffer( -toolD*.3 ).buffer( -toolD*.6 ).buffer( toolD*0.6 ).buffer( 0.0 ), 
                     toolD, workZ, dVal)
                 self.mPathsToGCode("FOAM",
                             dVal, foamPaths, workZ, fFoam, fAll,
                             calE = True,
-                            layerH = zFoamFromLast
+                            layerH = zFoamFromLast,
+                            addLiftingToSafeH=False
                             )
                 
                 fFoam.write(dVal['foam']['sufix'])
                 fAll.write(dVal['foam']['sufix'])
+                
+                if fFoamOW == None:
+                    fFoamOW = open(self.outFile+"_foamPath_{}.gcode".format(fFoamOWC),"w")
+                    fFoamOW.write(";FOAM RUN file count:{}\n".format(fFoamOWC))
+                    fFoamOW.write("G0 Z{0} F{1}\n".format(
+                        dVal['foam']['ZSafe']+offSets[2],
+                        dVal['feeds']['rVertical'] 
+                        ))
+                    fFoamOW.write(dVal['foam']['prefix'])
+                    
+                    self.mPathsToGCode("FOAM One Work {}".format(fFoamOWC),
+                            dVal, foamPaths, workZ, fFoamOW, fAll,
+                            calE = True,
+                            layerH = zFoamFromLast,
+                            addLiftingToSafeH = False
+                            )
+                    
+                    fFoamOW.write(dVal['foam']['sufix'])
+                    fFoamOW.write("M2\n")
+                    fFoamOW.close()
+                    fFoamOWC+=1
+                    fFoamOW = None
+                
+                
                 # foam extruder path
-
-
 
                 
                 if millStatus == False:
+                    millStatus = True
+
                     fMillTops.write(dVal['mill']['prefix'])
                     fAll.write(dVal['mill']['prefix'])
-                    millStatus = True
+                    
+                    if fMillOW == None:
+                        fMillOW = open(self.outFile+"_millTopsPath_{}.gcode".format(fMillOWC),"w")
+                        fMillOW.write(";Mill Out One Work {}\n".format(fMillOWC))
+                        #fMillOW.write("G0 Z{0} F{1}\n".format(
+                        #    dVal['foam']['ZSafe']+offSets[2],
+                        #    dVal['feeds']['rVertical']
+                        #    ))
+                        fMillOW.write(dVal['mill']['prefix'])
+                    
                 
                 # mill top flat stock
                 if 0:
@@ -452,7 +493,9 @@ class ParserCura:
                 toolD = dVal['mill']['toolD']-dVal['mill']['millTopOverlap'] 
                 millTopsPaths = self.makeIslandPath(fPolyOrg, toolD, workZ, dVal)
                 self.mPathsToGCode("MILL TOP FLAT STOCK",
-                    dVal, millTopsPaths, workZ, fMillTops, fAll)
+                    dVal, millTopsPaths, workZ, fMillTops, fAll, addErrorOptimalization=True)
+                self.mPathsToGCode("MILL TOP FLAT STOCK One Work {}".format(fMillOWC),
+                    dVal, millTopsPaths, workZ, fMillOW, fAll, addErrorOptimalization=True)
                 # mill top flat stock
                 
                 
@@ -475,6 +518,8 @@ class ParserCura:
                             millFlatsPaths = self.makeIslandPath(flatIsland, toolD, lastMz, dVal)
                             self.mPathsToGCode("MILL FLAT PARTS",
                                 dVal, millFlatsPaths, lastMz, fMillTops, fAll)
+                            self.mPathsToGCode("MILL FLAT PARTS One Work {}".format(fMillOWC),
+                                dVal, millFlatsPaths, lastMz, fMillOW, fAll)
                             millFlatsStats+=1
                     
                     lastMz = mz
@@ -518,6 +563,9 @@ class ParserCura:
                     self.mPathsToGCode("outer mill", 
                         dVal, path, mz, fMillTops, fAll
                         )
+                    self.mPathsToGCode("outer mill One Work {}".format(fMillOWC), 
+                        dVal, path, mz, fMillOW, fAll
+                        )
              
                 if millStatus:
                     fMillTops.write(dVal['mill']['sufix'])
@@ -525,8 +573,13 @@ class ParserCura:
                     millStatus = False
                 # mill outer mill
                 
-                
                 zTzs = [] 
+                if fMillOW != None:
+                    fMillOW.write(dVal['mill']['sufix'])
+                    fMillOW.write("M2\n")
+                    fMillOW.close()
+                    fMillOW = None
+                    fMillOWC+= 1
             
             if lPm:
                 foamLast = z
@@ -564,37 +617,67 @@ class ParserCura:
             polys = polys.buffer( -(toolD) ).buffer(0.0)
         return paths
 
-    def mPathsToGCode(self, desc, dVal, millpaths, workZ, fileToPut, fAll, calE=False, layerH=0 ):
+
+    def mPathsToGCode(self, desc, dVal, millpaths, workZ, fileToPut, fAll, 
+            calE=False, layerH=0, 
+            addLiftingToSafeH=True, 
+            addErrorOptimalization=False
+            ):
         offSets = dVal['bottomLeft']
+        zWorkAddWithSafe = offSets[2]
+        allowForError = dVal['mill']['toolD']*2.0
+        
+        if addLiftingToSafeH:
+            zWorkAddWithSafe+= dVal['foam']['ZSafe']+dVal['foam']['layerH']
+            
         if calE:
             # 1 liter is 1 000 000 mm^3 ?
             Earea = (  
                 dVal['foam']['width'] * 
                 layerH / dVal['foam']['expand'] )*dVal['foam']['Etune'] 
-            print("Earea is %s"%Earea)
+            print("Earea is ",Earea," for desc (",desc,")")
         eBase = 0.0                  
         
         for ppi,path in enumerate(millpaths):
-            gLine = "\n;{0} PATHS path START at Z{1} NO{2}/{3}\n".format(
+            gLine = "\n;{0} PATHS path START at Z{1} NO{2}/{3} ErrorOptimalization: {4}\n".format(
                 desc, 
                 workZ, 
                 ppi, 
-                len(millpaths)
+                len(millpaths),
+                addErrorOptimalization
                 )
+            
             fileToPut.write( gLine )
             fAll.write( gLine )
             
             if calE:
-                fileToPut.write( ";4lcnc G92 E0\n" )
-                fAll.write( ";4lcnc G92 E0\n" )
+                if self.outFileMakeE:
+                    fileToPut.write( "G92 E0\n" )
+                    fAll.write( "G92 E0\n" )
+                else:
+                    fileToPut.write( ";4lcnc G92 E0\n" )
+                    fAll.write( ";4lcnc G92 E0\n" )
+                eBase = 0.0
             
             pLast = None
             dist = 0.0
+            
+            
             for pi,p in enumerate(path):
-                pSp = SPoint(p['X'],p['Y'])                       
-                if pi == 0:
-                    gLine = "G0 Z{0} F{3}\nG0 Z{0} X{1} Y{2} F{3}\n".format(
-                        self.rou( workZ+dVal['foam']['ZSafe']+offSets[2]+dVal['foam']['layerH'] ),
+                pSp = SPoint(p['X'],p['Y'])
+                
+                addLift = True
+                if pi == 0 and addErrorOptimalization and ppi > 0:
+                    etPointPrev = millpaths[ppi-1][-1]
+                    etDist = self.cal.distance(pSp, SPoint( etPointPrev['X'],etPointPrev['Y'] ) )
+                    if etDist < allowForError:
+                        #print(" error optimalization dist to previest",etDist," ppi",ppi)
+                        addLift = False
+                
+                                       
+                if pi == 0 and addLift:
+                    gLine = "G0 Z{0} F{3}\nG0 X{1} Y{2} Z{0} F{3}\n".format(
+                        self.rou( workZ+zWorkAddWithSafe ),
                         self.rou( p['X']+offSets[0] ),
                         self.rou( p['Y']+offSets[1] ),
                         dVal['feeds']['rHorizontal']
@@ -602,17 +685,27 @@ class ParserCura:
                     fileToPut.write( gLine )
                     fAll.write( gLine )
                     
+                    
                 gLine = "%s"%self.V4lToStr(p, offSet = offSets)
+                
+                
                 if calE and pLast != None:
                     dist = self.cal.distance(pSp, pLast)
                     eVol = Earea*dist/1000.00 # its milliliters
                     self.totalFoamMil+= eVol
                     #print("dist:",dist,' eVol',eVol)
-                    gLine+= " ;4lcnc E{} dist {} used E {}".format(
-                        eBase+eVol,
-                        dist,
-                        eVol
-                        )
+                    if self.outFileMakeE:
+                        gLine+= " E{} ; dist {} used E {}".format(
+                            eBase+eVol,
+                            dist,
+                            eVol
+                            )
+                    else:
+                        gLine+= " ;4lcnc E{} dist {} used E {}".format(
+                            eBase+eVol,
+                            dist,
+                            eVol
+                            )
                     eBase+= eVol
                 
                 gLine+= "\n"    
@@ -621,18 +714,35 @@ class ParserCura:
                 
                 
                 pLast = pSp
-                
-                
-            gLine = "G0 Z{0} F{1}\n \n;{2} PATHS path END at Z{3} NO{4}/{5}\n\n".format(
-                (workZ+dVal['foam']['ZSafe']+offSets[2]+dVal['foam']['layerH']),
-                dVal['feeds']['rVertical'], 
-                desc, 
-                workZ, 
-                ppi, 
-                len(millpaths)
-                )
+            
+            
+            addLiftAtEnd = True
+            if addErrorOptimalization:
+                try:
+                    etPointNext = millpaths[ppi+1][0]
+                    #print("etPointNext",etPointNext)
+                    etDist = self.cal.distance(pSp, SPoint( etPointNext['X'],etPointNext['Y'] ) )
+                    if etDist < allowForError:
+                        #print(" error optimalization dist to next",etDist," ppi",ppi)
+                        addLiftAtEnd = False
+                except:
+                    pass
+               
+            if addLiftAtEnd: 
+                gLine = "G0 Z{0} F{1}\n \n;{2} PATHS path END at Z{3} NO{4}/{5}  ErrorOptimalization: {6}\n\n".format(
+                    (workZ+zWorkAddWithSafe),
+                    dVal['feeds']['rVertical'], 
+                    desc, 
+                    workZ, 
+                    ppi, 
+                    len(millpaths),
+                    addErrorOptimalization
+                    )
+            else:
+                gLine = "; error optimalization make it less work "
             fileToPut.write( gLine )
             fAll.write( gLine )
+    
         
     def makeOffsetsLines( self, paths, dVal ):
         print("- make offsets from poligones")
@@ -1026,12 +1136,12 @@ class ParserCura:
         
     def makeOffsets( self, pathsV4l, bottomLeft ):
         #return pathsV4l
-        print("- offset work pice. New bottom left is {} mm x {} mm".format(
-            bottomLeft[0],bottomLeft[1]
+        print("- offset work pice. New bottom left is {} mm x {} mm x {} mm".format(
+            bottomLeft[0],bottomLeft[1],bottomLeft[2]
             ))
         xOff = self.xMin - bottomLeft[0]
         yOff = self.yMin - bottomLeft[1]
-        #zOff = bottomLeft[2]
+        #zOff = self.zMin - bottomLeft[2]
         
         
         for ppi, path in enumerate(pathsV4l):
@@ -1042,10 +1152,16 @@ class ParserCura:
                         l4['X']-= xOff
                     except:
                         pass
+                    
                     try:
                         l4['Y']-= yOff
                     except:
                         pass
+                    
+                    #try:
+                    #    l4['Z']-= zOff
+                    #except:
+                    #    pass
                     
                     pathsV4l[ppi][pi] = l4
                     
@@ -1085,7 +1201,6 @@ class ParserCura:
             v['G'] = -1
                     
         return v
-    
     
     def V4lToStr(self,v4l, offSet = None):
         tr = ""

@@ -50,6 +50,7 @@ G92 E0
 M118 Foam work start end
 ; foam work start ends gcode
 '''
+
 foamEnd = '''
 ; foam work end gcode
 M118 Foam work end cleaning ....
@@ -131,7 +132,7 @@ G90
 ;;;G0 X2100.00 F1000
 
 ; to parking spot 
-G0 X??millHeadXPart?? F8000
+G0 X??millHeadXPark?? F8000
 
 M118 Mill stops and park
 ; mill end end
@@ -142,14 +143,14 @@ dVal = {
     'cura':{
         'outerF': 123.00 #mm/s
         },
-    'bottomLeft': [
-        100.0,
-        50.0,
-        20.0
+    'bottomLeft': [#[0.1,0.1,0.1],
+        260.0,  # x
+        480.0,   # y
+        49.00    # z
         ],
     'gcode': {
         'foamPrime': 3.2,    # mil ? E 
-        'millHeadXPart': 200.0,
+        'millHeadXPark': 2000.0,
         'valvA':    11,  #pin
         'valvB':    11,  #pin
         'valvAir':  45,  #pin
@@ -167,8 +168,8 @@ dVal = {
         'wVertical': 600.0,
         },
     'foam': {
-        'layerH': 20.0,      
-        'width': 50.0,
+        'layerH': 13.0,      
+        'width': 40.0,
         'expand': 20.0,
         'Etune': 0.38,
         'ZSafe': 10.0,
@@ -177,9 +178,9 @@ dVal = {
         },
     'mill': {
         'toolD' : 3.175,
-        'toolH' : 20.0,
+        'toolH' : 10.0,
         'layerH': 0.5,
-        'millTopOverlap': 0.95, # mm
+        'millTopOverlap': 0.5, # mm
         'prefix': millStart,
         'sufix': millEnd
         },
@@ -204,6 +205,25 @@ def findArg(args,fArg):
             return a[fArgLen+1:]
             
     return None  
+
+def printHelp():
+    print('''
+Current config:
+    {defVal}
+        
+        
+Help:
+    Aplication usage:
+    main.py inputFile.gcode option
+    
+option:
+    E      -    final version
+    noE    -    don't generate E axis for files
+    
+        '''.format(
+            defVal = dVal
+            ))
+    sys.exit(0)
   
   
 if __name__ == "__main__":
@@ -211,36 +231,46 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     argsCount = len( args )
     
-    print("args: {0}".format(args))
+    print("args{}: {}".format(len(args),args))
     
-    if argsCount == 0:
-        print('''
-Current config:
-    {defVal}
+    if argsCount not in [2]:
+        printHelp()
         
         
-Help:
-    Aplication usage:
-    main.py inputFile.gcode outputFile.gcode
-    
-            '''.format(
-                defVal = dVal
-                ))
-        sys.exit(0)
     if argsCount == 2:
         inFile = args[0]
-        outFile = args[1]
+        ft = inFile.split(".")
+        outFile = '.'.join(ft[:-1])
+        arg2 = args[1]
+        if arg2 in [ 'E', 'noE']:
+            outFile+="_"+arg2
+        else:
+            printHelp()
+        
+        if arg2 in ['h','-h','--h','--help']:
+            printHelp()
+            
+        
         print('''
 input file:     {inF}
 output file:    {ouF}
+option:         {option}
         '''.format(
             inF = inFile,
-            ouF = outFile
+            ouF = outFile,
+            option = arg2
             ))
         
+        #print("inFile",inFile)
+        #print("outFile",outFile)
+        ##print("outFileBuild[",outFileBuild,']')
+        #print("exit debug")
+        #sys.exit(0)
+        
+        makeE = True if arg2 == 'E' else False
         
         pc = ParserCura()
-        pc.makeIt(inFile,dVal)
+        pc.makeIt(inFile,outFile,makeE,dVal)
         print("parser makeIt DONE!")
         
         if 0:
