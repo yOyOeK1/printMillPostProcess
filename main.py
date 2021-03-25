@@ -142,15 +142,15 @@ M118 Mill stops and park
 dVal = {
     'cura':{
         'outerF': 123.00 #mm/s
-        },
+        },    
     'bottomLeft': [#[0.1,0.1,0.1],
-        260.0,  # x
-        480.0,   # y
-        49.00    # z
+        2720.0,  # x
+        787.0,   # y
+        116.00    # z
         ],
     'gcode': {
         'foamPrime': 3.2,    # mil ? E 
-        'millHeadXPark': 2000.0,
+        'millHeadXPark': 3900.0,
         'valvA':    11,  #pin
         'valvB':    11,  #pin
         'valvAir':  45,  #pin
@@ -168,25 +168,25 @@ dVal = {
         'wVertical': 600.0,
         },
     'foam': {
-        'layerH': 13.0,      
-        'width': 40.0,
+        'layerH': 11.0,      
+        'width': 20.0,
         'expand': 20.0,
-        'Etune': 0.38,
-        'ZSafe': 10.0,
+        'Etune': 1.0,
+        'ZSafe': 13.0,
         'prefix': foamStart,
         'sufix': foamEnd
         },
     'mill': {
-        'toolD' : 3.175,
-        'toolH' : 10.0,
+        'toolD' : 4.0, #12.7
+        'toolH' : 10.0, #26.0
         'layerH': 0.5,
-        'millTopOverlap': 0.5, # mm
+        'millTopOverlap': 0.2, # mm
         'prefix': millStart,
         'sufix': millEnd
         },
     
     }
-  
+dVal['bottomLeft'] = [0.1,0.1,0.1]
   
 
 dVal['foam']['prefix'] = mkPrefixAndSufix( dVal['foam']['prefix'],dVal )
@@ -251,6 +251,13 @@ if __name__ == "__main__":
             printHelp()
             
         
+        fa = FileActions()
+        fName = os.path.basename(outFile)
+        fa.mkDir(outFile)
+        outFile = fa.join(outFile,fName)
+        
+        
+        
         print('''
 input file:     {inF}
 output file:    {ouF}
@@ -260,6 +267,9 @@ option:         {option}
             ouF = outFile,
             option = arg2
             ))
+        
+        #sys.exit(9)
+        
         
         #print("inFile",inFile)
         #print("outFile",outFile)

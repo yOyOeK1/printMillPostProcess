@@ -8,6 +8,7 @@ import random
 import math
 from myPickle import myPickle
 from FileActions import *
+from TimeHelper import *
 
 
 def mkPrefixAndSufix(gcodeLines,dVal):
@@ -90,13 +91,19 @@ class ParserCura:
         print("ParserCura __init__")
         self.cal = MyCalculate()
         self.pic = myPickle()
+        self.th = TimeHelper()
         self.fa = FileActions()
         self.simpli = 0.05
         self.totalFoamMil = 0.0
+        self.makeExtension = 'ngc'
+        self.timeLast = 0
         
         
     def makeIt(self, filePath, outFile, makeE, dVal):
         self.outFile = outFile
+        #print("outFile",outFile)
+        #sys.exit(10)
+        
         self.outFileMakeE = makeE
         self.bottomLeftForFinish = dVal['bottomLeft']
         print("ParserCura makeIt [{0}]".format(filePath))
@@ -110,8 +117,11 @@ class ParserCura:
         self.lineWidth = self.lookForLineWidth( self.linesOrg )
         self.filamentWidth = self.lookForFilamentWidth( self.linesOrg )
         self.layerHeight = self.lookForLayerHeight( self.linesOrg )
+        print("- make complit lines")
         self.complitLines,self.complitV4l = self.makeComplitLines( self.linesOrg )
+        print("- solt layers")
         self.zLayers = sorted(self.zLayers.keys())
+        print("- make offsets")
         self.complitV4l = self.makeOffsets( self.complitV4l, dVal['bottomLeft'] )
         #self.allWorkPathsV4l = self.extractAllWorkPaths( self.complitV4l, dVal )
         self.allWorkPathsV4l = self.complitV4l
@@ -229,11 +239,23 @@ class ParserCura:
         
         pc = len(pathsV4l)
         ppiEvery = int(pc/10.0)
+        tStart = self.th.getTimestamp(True)
+        
         
         for ppi,path in enumerate( pathsV4l ):
             if (ppi%ppiEvery) == 0:
+                tNow = self.th.getTimestamp(True)
+                doneIn = tNow - tStart
                 print("    progress {}/{}".format(ppi,pc))
-            if lastZ != path[0]['Z'] or len(pathsV4l) == ppi+1:
+                #if ppi > 0:
+                #    tMap = self.cal
+                #    print("    ETA ~",
+                #          self.th.getNiceShortDate()
+                #          )
+                #    print("    working for ",
+                #          self.th.getNiceShortDate( (tNow-tStart)/1000000 ) )
+                
+            if lastZ != path[0]['Z'] or pc == ppi+1:
                 
                 if len(lines) > 0:
                     mp = MultiPolygon()
@@ -350,19 +372,19 @@ class ParserCura:
         fMillOW = None
         fMillOWC = 1
         
-        fFoam = open(self.outFile+"_foamPath.gcode","w")
+        fFoam = open(self.outFile+"_lAll_foam."+self.makeExtension,"w")
         fFoam.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical'] 
             ))
         
-        fMillTops = open(self.outFile+"_millTopsPath.gcode","w")
+        fMillTops = open(self.outFile+"_lAll_mill."+self.makeExtension,"w")
         fMillTops.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical']
             ))
                 
-        fAll = open(self.outFile+"_allPaths.gcode","w")
+        fAll = open(self.outFile+"_lAll_foamMill."+self.makeExtension,"w")
         fAll.write("G0 Z{0} F{1}\n".format(
             dVal['foam']['ZSafe']+offSets[2],
             dVal['feeds']['rVertical']
@@ -427,7 +449,8 @@ class ParserCura:
                 toolD = dVal['foam']['width']*0.5 
                 fPolyOrg = fPoly
                 foamPaths = self.makeIslandPath(
-                    fPoly.buffer( -toolD*.3 ).buffer( -toolD*.6 ).buffer( toolD*0.6 ).buffer( 0.0 ), 
+                    #fPoly.buffer( -toolD*.3 ).buffer( -toolD*.6 ).buffer( toolD*0.6 ).buffer( 0.0 ),
+                    fPoly.buffer( -(dVal['mill']['toolD']*.5) ).buffer(-4.0), 
                     toolD, workZ, dVal)
                 self.mPathsToGCode("FOAM",
                             dVal, foamPaths, workZ, fFoam, fAll,
@@ -440,7 +463,11 @@ class ParserCura:
                 fAll.write(dVal['foam']['sufix'])
                 
                 if fFoamOW == None:
-                    fFoamOW = open(self.outFile+"_foamPath_{}.gcode".format(fFoamOWC),"w")
+                    fFoamOW = open(
+                        self.outFile+"_l{l}_foam.{ext}".format(
+                            l=fFoamOWC,ext=self.makeExtension
+                            ),
+                        "w")
                     fFoamOW.write(";FOAM RUN file count:{}\n".format(fFoamOWC))
                     fFoamOW.write("G0 Z{0} F{1}\n".format(
                         dVal['foam']['ZSafe']+offSets[2],
@@ -472,7 +499,11 @@ class ParserCura:
                     fAll.write(dVal['mill']['prefix'])
                     
                     if fMillOW == None:
-                        fMillOW = open(self.outFile+"_millTopsPath_{}.gcode".format(fMillOWC),"w")
+                        fMillOW = open(
+                            self.outFile+"_l{l}_mill.{ext}".format(
+                                l=fMillOWC,ext=self.makeExtension
+                                ),
+                            "w")
                         fMillOW.write(";Mill Out One Work {}\n".format(fMillOWC))
                         #fMillOW.write("G0 Z{0} F{1}\n".format(
                         #    dVal['foam']['ZSafe']+offSets[2],
@@ -1139,29 +1170,31 @@ class ParserCura:
         print("- offset work pice. New bottom left is {} mm x {} mm x {} mm".format(
             bottomLeft[0],bottomLeft[1],bottomLeft[2]
             ))
-        xOff = self.xMin - bottomLeft[0]
-        yOff = self.yMin - bottomLeft[1]
+        print("    current xmin{} and ymin{}".format(self.xMin, self.yMin))
+        xOff = -self.xMin +0.001#bottomLeft[0] - self.xMin
+        yOff = -self.yMin +0.001#bottomLeft[1] - self.yMin
         #zOff = self.zMin - bottomLeft[2]
+        #zOff = bottomLeft[2]
         
         
         for ppi, path in enumerate(pathsV4l):
             for pi, l4 in enumerate(path):
                 if l4['G'] in [0,1]:
                     try:
-                        #print('offset oldX',l4['X']," new ",(l4['X']- xOff))
-                        l4['X']-= xOff
+                        #print('offset oldX',l4['X']," new ",(l4['X']+ xOff))
+                        l4['X']+= xOff
                     except:
-                        pass
+                        print("EE - 939.z")
                     
                     try:
-                        l4['Y']-= yOff
+                        l4['Y']+= yOff
                     except:
-                        pass
+                        print("EE - 939.y")
                     
                     #try:
-                    #    l4['Z']-= zOff
+                    #    l4['Z']+= zOff
                     #except:
-                    #    pass
+                    #    print("EE - 939.z")
                     
                     pathsV4l[ppi][pi] = l4
                     
