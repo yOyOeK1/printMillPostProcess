@@ -450,13 +450,14 @@ class ParserCura:
                 fPolyOrg = fPoly
                 foamPaths = self.makeIslandPath(
                     #fPoly.buffer( -toolD*.3 ).buffer( -toolD*.6 ).buffer( toolD*0.6 ).buffer( 0.0 ),
-                    fPoly.buffer( -(dVal['mill']['toolD']*.5) ).buffer(-4.0), 
+                    fPoly.buffer( -(dVal['mill']['toolD']*.5) ).buffer(-dVal['foam']['fromEdgeIn']), 
                     toolD, workZ, dVal)
                 self.mPathsToGCode("FOAM",
                             dVal, foamPaths, workZ, fFoam, fAll,
                             calE = True,
                             layerH = zFoamFromLast,
-                            addLiftingToSafeH=False
+                            addLiftingToSafeH=False,
+                            fromInToOut = True
                             )
                 
                 fFoam.write(dVal['foam']['sufix'])
@@ -479,7 +480,8 @@ class ParserCura:
                             dVal, foamPaths, workZ, fFoamOW, fAll,
                             calE = True,
                             layerH = zFoamFromLast,
-                            addLiftingToSafeH = False
+                            addLiftingToSafeH = False,
+                            fromInToOut = True
                             )
                     
                     fFoamOW.write(dVal['foam']['sufix'])
@@ -652,8 +654,13 @@ class ParserCura:
     def mPathsToGCode(self, desc, dVal, millpaths, workZ, fileToPut, fAll, 
             calE=False, layerH=0, 
             addLiftingToSafeH=True, 
-            addErrorOptimalization=False
+            addErrorOptimalization=False,
+            fromInToOut = False
             ):
+        
+        if fromInToOut:
+            millpaths = millpaths[::-1]
+        
         offSets = dVal['bottomLeft']
         zWorkAddWithSafe = offSets[2]
         allowForError = dVal['mill']['toolD']*2.0
@@ -669,13 +676,15 @@ class ParserCura:
             print("Earea is ",Earea," for desc (",desc,")")
         eBase = 0.0                  
         
+        
         for ppi,path in enumerate(millpaths):
-            gLine = "\n;{0} PATHS path START at Z{1} NO{2}/{3} ErrorOptimalization: {4}\n".format(
+            gLine = "\n;{0} PATHS path START at Z{1} NO{2}/{3} ErrorOptimalization: {4} order from in {5}\n".format(
                 desc, 
                 workZ, 
                 ppi, 
                 len(millpaths),
-                addErrorOptimalization
+                addErrorOptimalization,
+                fromInToOut
                 )
             
             fileToPut.write( gLine )

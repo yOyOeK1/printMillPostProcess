@@ -39,12 +39,12 @@ M0
 foamStart = '''
 ; foam work start start gcode
 M118 Foam work start
-M302 S0
 T0
+M302 S0
 
 ;prime ?
 G92 E0
-G0 F10 E??foamPrime??
+G0 F800 E??foamPrime??
 G92 E0
 
 M118 Foam work start end
@@ -104,8 +104,8 @@ M118 Foam work end and park
 millStart = '''
 ; mill start
 M118 Mill starts ...
-
 T1
+
 ; spin up speendel
 M42 P??spindelPinOnOff?? S??selenoidOn??
 
@@ -126,11 +126,6 @@ G90
 ; wait 4 sec
 
 
-; park it in idle place
-;;;G0 X2000.00 F5000
-; slow down for connection on track
-;;;G0 X2100.00 F1000
-
 ; to parking spot 
 G0 X??millHeadXPark?? F8000
 
@@ -144,9 +139,9 @@ dVal = {
         'outerF': 123.00 #mm/s
         },    
     'bottomLeft': [#[0.1,0.1,0.1],
-        2720.0,  # x
-        787.0,   # y
-        116.00    # z
+        2600.0,  # x
+        689.0,   # y
+        111.00    # z
         ],
     'gcode': {
         'foamPrime': 3.2,    # mil ? E 
@@ -168,9 +163,10 @@ dVal = {
         'wVertical': 600.0,
         },
     'foam': {
-        'layerH': 11.0,      
-        'width': 20.0,
+        'layerH': 12.0,      
+        'width': 30.0,
         'expand': 20.0,
+        'fromEdgeIn': 7.0,
         'Etune': 1.0,
         'ZSafe': 13.0,
         'prefix': foamStart,
@@ -186,8 +182,10 @@ dVal = {
         },
     
     }
+
 dVal['bottomLeft'] = [0.1,0.1,0.1]
-  
+dVal['mill']['toolD'] = 12.7
+dVal['mill']['toolH'] = 26.0
 
 dVal['foam']['prefix'] = mkPrefixAndSufix( dVal['foam']['prefix'],dVal )
 dVal['foam']['sufix'] = mkPrefixAndSufix( dVal['foam']['sufix'],dVal )
