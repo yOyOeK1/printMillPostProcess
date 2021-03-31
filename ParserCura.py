@@ -457,7 +457,7 @@ class ParserCura:
                             calE = True,
                             layerH = zFoamFromLast,
                             addLiftingToSafeH=False,
-                            fromInToOut = True
+                            fromInToOut = False
                             )
                 
                 fFoam.write(dVal['foam']['sufix'])
@@ -481,7 +481,7 @@ class ParserCura:
                             calE = True,
                             layerH = zFoamFromLast,
                             addLiftingToSafeH = False,
-                            fromInToOut = True
+                            fromInToOut = False
                             )
                     
                     fFoamOW.write(dVal['foam']['sufix'])
@@ -661,6 +661,7 @@ class ParserCura:
         if fromInToOut:
             millpaths = millpaths[::-1]
         
+        addPreloadZero = False
         offSets = dVal['bottomLeft']
         zWorkAddWithSafe = offSets[2]
         allowForError = dVal['mill']['toolD']*2.0
@@ -690,13 +691,32 @@ class ParserCura:
             fileToPut.write( gLine )
             fAll.write( gLine )
             
+            epreDist = 0.0
+            epreLoad = 0.0
             if calE:
-                if self.outFileMakeE:
-                    fileToPut.write( "G92 E0\n" )
-                    fAll.write( "G92 E0\n" )
+                try:
+                    epP0 = path[0]
+                    epP1 = millpaths[ppi-1][-1]
+                    epreP0 = SPoint(epP0['X'],epP0['Y'])
+                    epreP1 = SPoint(epP1['X'],epP1['Y'])
+                    epreDist = self.cal.distance( epreP0, epreP1 )
+                except:
+                    print("EE - epreload distance 003")
+                if ppi == 0 or epreDist>= dVal['foam']['preloadIfDistance']:
+                    print("epreDist is",epreDist,' adding preload! ',ppi)
+                    epreLoad = -dVal['foam']['preloadStart']
+                    fileToPut.write( ";adding preload\n" )
+                    fAll.write( ";adding preload\n" )
+                    addPreloadZero = True
                 else:
-                    fileToPut.write( ";4lcnc G92 E0\n" )
-                    fAll.write( ";4lcnc G92 E0\n" )
+                    addPreloadZero = False
+                
+                if self.outFileMakeE:
+                    fileToPut.write( "G92 E{}\n".format(epreLoad) )
+                    fAll.write( "G92 E{}\n".format(epreLoad) )
+                else:
+                    fileToPut.write( ";4lcnc G92 E{}\n".format(epreLoad) )
+                    fAll.write( ";4lcnc G92 E{}\n".format(epreLoad) )
                 eBase = 0.0
             
             pLast = None
@@ -716,11 +736,21 @@ class ParserCura:
                 
                                        
                 if pi == 0 and addLift:
-                    gLine = "G0 Z{0} F{3}\nG0 X{1} Y{2} Z{0} F{3}\n".format(
+                    if ppi == 0 or epreDist>= dVal['foam']['preloadIfDistance']:
+                        if self.outFileMakeE:
+                            preloadIfPressent = 'G1 E0\n'
+                        else:
+                            preloadIfPressent = ';4lcnc  1 G1 E0\n'
+                    else:
+                        preloadIfPressent = ''
+                    
+                    
+                    gLine = "G0 Z{0} F{3}\nG0 X{1} Y{2} Z{0} F{3}\n{4}".format(
                         self.rou( workZ+zWorkAddWithSafe ),
                         self.rou( p['X']+offSets[0] ),
                         self.rou( p['Y']+offSets[1] ),
-                        dVal['feeds']['rHorizontal']
+                        dVal['feeds']['rHorizontal'],
+                        preloadIfPressent
                         )
                     fileToPut.write( gLine )
                     fAll.write( gLine )

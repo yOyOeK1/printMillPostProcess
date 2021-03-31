@@ -4,7 +4,6 @@ import os
 from ParserCura import *
 
 '''
-
 cura files 3.1.0
 
 M218 T1 X?? Y?? Z?? - offset of t1 to t0 in x
@@ -164,13 +163,15 @@ dVal = {
         },
     'foam': {
         'layerH': 12.0,      
-        'width': 30.0,
+        'width': 36.0,
         'expand': 20.0,
-        'fromEdgeIn': 7.0,
+        'fromEdgeIn': 9.0,
         'Etune': 1.0,
         'ZSafe': 13.0,
         'prefix': foamStart,
-        'sufix': foamEnd
+        'sufix': foamEnd,
+        'preloadIfDistance': 60.0,
+        'preloadStart': 0.5 #add so much on start of paths
         },
     'mill': {
         'toolD' : 4.0, #12.7
@@ -183,7 +184,7 @@ dVal = {
     
     }
 
-dVal['bottomLeft'] = [0.1,0.1,0.1]
+#dVal['bottomLeft'] = [0.1,0.1,0.1]
 dVal['mill']['toolD'] = 12.7
 dVal['mill']['toolH'] = 26.0
 
